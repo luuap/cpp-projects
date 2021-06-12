@@ -1,5 +1,7 @@
-#include <iostream> // cout, endl, boolalpha
 #include <array> // array
+#include <algorithm> // copy, sort, rotate, upper_bound
+#include <exception> // exception
+#include <iostream> // cout, endl, boolalpha
 #include <numeric> // iota
 #include <random>  // mt19937, seed_seq, uniform_int_distribution
 #include <string> // string
@@ -8,19 +10,110 @@
 // #include <utility> // swap
 
 template <std::size_t S>
+void print_array(std::array<int, S> &array) {
+  for (auto e : array) {
+    std::cout << e << ' ';
+  }
+  std::cout << std::endl;
+}
+
+template <std::size_t S>
 void quick_sort(std::array<int, S> &array) {
  // TODO
 }
 
 template <std::size_t S>
-void merge_sort(std::array<int, S> &array) {
- // TODO
+void merge_v0(std::array<int, S> &arr, size_t left, size_t mid, size_t right) {
+  
+  size_t size_left = mid - left + 1;
+
+  // Note: typically we put + 1 when calculating size from inclusive indices, 
+  //       but since we don't want to include the item at mid on the right part, we omit the + 1
+  size_t size_right = right - mid;
+
+  int *temp_arr = new int[size_left + size_right];
+
+  // Create a copy
+  std::copy(arr.begin() + left, arr.begin() + right + 1, temp_arr);
+
+  // i is the amount of items we have taken from left array
+  size_t i = 0;
+  // j is the amount of items we have taken from right array
+  size_t j = 0;
+  // k is the start of the sorted part in the original array
+  size_t k = left;
+
+  // Compare the start of the two halves, push the min of the two into the sorted part (we can do this because both parts are already sorted)
+  while (i < size_left && j < size_right) {
+
+    // Note: checking for equality makes it stable
+    //       also the offset to get to the right part is size_left
+    if (temp_arr[i] <= temp_arr[size_left + j]) {
+      arr[k] = temp_arr[i];
+      i += 1;
+    }
+    else {
+      arr[k] = temp_arr[size_left + j];
+      j += 1;
+    }
+
+    k += 1;
+  }
+
+  // Note: at this point one, one of the two halves have had all their items put in place, do the rest for the other half
+
+  // Put the rest of the left part
+  while (i < size_left) {
+    arr[k] = temp_arr[i];
+    k += 1;
+    i += 1;
+  }
+
+  // Put the rest of the right part
+  while (j < size_right) {
+    arr[k] = temp_arr[size_left + j];
+    k += 1;
+    j += 1;
+  }
+
+  delete[] temp_arr;
+}
+
+template <std::size_t S>
+void merge_sort_v0_helper(std::array<int, S> &arr, size_t left, size_t right) {
+  if (left < right) {
+    size_t mid = (left + right) / 2;
+
+    // recursively call merge sort for left half ...
+    merge_sort_v0_helper(arr, left, mid);
+    // ... and right half
+    merge_sort_v0_helper(arr, mid + 1, right);
+
+    // merge left and right parts
+    // Note: at this point [left, mid] is sorted and [mid + 1, right] is sorted
+    merge_v0(arr, left, mid, right);
+    // TODO: make merge swappable with other sorting algorithms, to do this we need might need to make functions receive begin and end iterators
+
+  }
+}
+
+/**
+ * Merge sort. Recursive.
+ * - divide the array into two parts
+ * - revursively call merge_sort on each of the two halves
+ * - the base case of the recursive call is when the subarray has a length of 1
+ * - after returning to the caller, each of the two halves should be sorted
+ * - merge the two halves and sort them
+ */
+template <std::size_t S>
+void merge_sort_v0(std::array<int, S> &arr) {
+  merge_sort_v0_helper(arr, 0, arr.size() - 1);
 }
 
 /**
  * Selection sort.
  * - find the index of the smallest value in the unsorted part
- * - push it into the sorted part (by swaping it with the first value of the unsorted part)
+ * - push it into the sorted part (by swaping it with the first value of the unsorted part, this makes it unstable)
  * - grow the sorted part, then repeat from the beginning of the unsorted part
  */
 template <std::size_t S>
@@ -45,9 +138,188 @@ void selection_sort(std::array<int, S> &arr) {
   }
 }
 
+/**
+ * Insertion sort v0. Inserts item to sorted part by swapping.
+ * - partition the array into sorted and unsorted parts
+ * - the sorted part is initially just arr[0]
+ * - insert items into the sorted part one by one starting from arr[1]
+ */
 template <std::size_t S>
-void insertion_sort(std::array<int, S> &array) {
+void insertion_sort_v0(std::array<int, S> &arr) {
+  for (int i = 1; i < arr.size(); ++i) {
 
+    int j = i;
+
+    // go through the sorted part, swap until value is in the right place (i.e. bubble it down to place)
+    while (j > 0 && arr[j - 1] > arr[j]) {
+      std::swap(arr[j - 1], arr[j]);
+      j -= 1;
+    }
+
+  }
+}
+
+/**
+ * Insertion sort v1. Shifts items instead of explicit swapping.
+ */
+template <std::size_t S>
+void insertion_sort_v1(std::array<int, S> &arr) {
+
+  for (int i = 1; i < arr.size(); ++i) {
+
+    // save the item at the current index (first value of the unsorted part)
+    int item = arr[i];
+
+    // Note: j starts from the back of the sorted part, it also serves as the insertion index for the element
+    int j = i - 1;
+
+    // shift all elements that are greater than item to the right by 1
+    while(j >=0 && arr[j] > item) {
+      // Note: this creates a `hole` at arr[j], a potential place to insert the item
+      arr[j + 1] = arr[j];
+      j -= 1;
+    }
+
+    // assign the item to the insertion index
+    // Note: j + 1 it because of the j -= 1 in last iteration of the while loop
+    arr[j + 1] = item;
+  }
+}
+
+/**
+ * Insertion sort v2. Binary search when looking for insertion index. Swaps elements using std::rotate.
+ */
+template <std::size_t S>
+void insertion_sort_v2(std::array<int, S> &arr) {
+
+  for (int i = 1; i < arr.size(); ++i) {
+    // do insertion when item to be inserted is not in the right place within the sorted part
+    if (arr[i] < arr[i - 1]) {
+
+      int val = arr[i];
+      int left = 0;
+      int right = i;
+      size_t mid = (left + right) / 2;
+      
+      // Note: we can opt for < instead of <= because we don't need to check the last single value
+      while (left < right) {
+
+        // Note: arr[mid] should be strictly greater than item so that it is stable
+        if (arr[mid] > val) {
+
+          // Note: if mid == 0, it will shortcircuit
+          if (mid == 0 || arr[mid - 1] <= val) {
+            break;
+          }
+          else {
+            right = mid - 1;
+          }
+        }
+        else if (arr[mid] <= val) {
+          left = mid + 1;
+        }
+
+        mid = (left + right) / 2;
+      }
+
+      // Note: last argument of rotate must point to one past the end
+      std::rotate(arr.begin() + mid, arr.begin() + i, arr.begin() + i + 1);
+
+    }
+  }
+}
+
+/**
+ * Insertion sort v3. Three lines. Makes use of iterators.
+ * @see example from https://en.cppreference.com/w/cpp/algorithm/rotate.
+ */
+template <std::size_t S>
+void insertion_sort_v3(std::array<int, S> &arr) {
+  for (auto i = arr.begin(); i != arr.end(); ++i) {
+    // Note: upper_bound returns a pointer to the first item that is greater than arr[i] 
+    //       within the sorted part (between [0, i - 1], recall that the last iterator must point to one past the end) 
+    //       (i.e. find where to insert the item).
+    //       Then rotate the the part (between [insertion_inex, i]) so that arr[i] would be the first item 
+    //       (i.e. swap the items around to put the item in place)
+    std::rotate(std::upper_bound(arr.begin(), i, *i), i, i + 1);
+  }
+}
+
+/**
+ * Finds the index where item would be inserted in a sorted array.
+ */
+template <std::size_t S>
+int find_insertion_point(std::array<int, S> &arr, int item) {
+  int right = arr.size() - 1;
+  int left = 0;
+  
+  // Insert at the end if item is greater than the last item in the array
+  if (arr[arr.size() - 1] <= item) {
+    return arr.size();
+  }
+
+  int mid = (left + right) / 2;
+
+  // Note: we can opt for < instead of <= because we don't need to check the last single value
+  while (left < right) {
+
+    std::cout << left << ' ' << mid << ' ' << right << std::endl;
+
+    // Note: arr[mid] should be strictly greater than item so that it is stable 
+    if (arr[mid] > item) {
+
+      // Note: if mid == 0, it will shortcircuit 
+      if (mid == 0 || arr[mid - 1] <= item) {
+        break;
+      } else {
+        right = mid - 1;
+      }
+
+    }
+    else if (arr[mid] <= item) {
+      left = mid + 1;
+    }
+
+    mid = (left + right) / 2;
+  }
+
+  return mid;
+}
+
+/**
+ * Binary search, iterative.
+ * Returns the index of the item if found, else returns -1
+ * assumes array is in ascending order
+ * [from, to]
+ */
+template <std::size_t S>
+int binary_search(std::array<int, S> &arr, int item, size_t from, size_t to)
+{
+
+  if (to < from) {
+    throw std::exception("to must be greater than from");
+  }
+
+  size_t left = from;
+  size_t right = to;
+
+  while (left <= right) {
+    // Note: integer division will truncate the decimal, same as floor()
+    size_t mid = (left + right) / 2;
+
+    // if item is less than the one in mid, then the item must be on the left side of mid
+    // Note: +/- 1 is to get rid of mid in search space, (i.e. only get the the left/right side of mid)
+    if (item < arr[mid]) {
+      right = mid - 1;
+    // if item is greater than the one in mid, then the item must be on the right side of mid
+    } else if (item > arr[mid]) {
+      left = mid + 1;
+    } else {
+      return mid;
+    }
+  }
+
+  return -1;
 }
 
 template <std::size_t S>
@@ -90,13 +362,6 @@ void shuffle(std::array<int, S>& array, std::string seed) {
 
 }
 
-template <std::size_t S>
-void print_array(std::array<int, S> &array) {
-  for (auto e : array) {
-    std::cout << e << std::endl;
-  }
-}
-
 int main() {
 
   std::array<int, 100> arr;
@@ -110,11 +375,19 @@ int main() {
   // Note: std::array overloads the = operator to copy each element instead of just the reference
   auto arr1 = arr;
 
-  selection_sort(arr1);
+  print_array(arr1);
+  // insertion_sort_v0(arr1);
+  // insertion_sort_v1(arr1);
+  // insertion_sort_v2(arr1);
+  // insertion_sort_v3(arr1);
+  // selection_sort(arr1);
+  merge_sort_v0(arr1);
 
+  // std::cout << find_insertion_point(arr1, -1) << std::endl;
+  // std::cout << binary_search(arr1, 0, 0, 9) << std::endl;
+
+  print_array(arr1);
   std::cout << std::boolalpha << is_ascending(arr1) << std::endl;
-
-  // print_array(arr1);
 
   return 0;
 }
