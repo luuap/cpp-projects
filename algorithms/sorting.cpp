@@ -10,16 +10,116 @@
 // #include <utility> // swap
 
 template <std::size_t S>
-void print_array(std::array<int, S> &array) {
-  for (auto e : array) {
+void print_array(std::array<int, S> &arr) {
+  for (auto e : arr) {
     std::cout << e << ' ';
   }
   std::cout << std::endl;
 }
 
+template <class Iterator>
+void print_array(Iterator begin, Iterator end) {
+  for (Iterator i = begin; i != end; ++i) {
+    std::cout << *i << ' ';
+  }
+  std::cout << std::endl;
+}
+
+/**
+ * Hoare_partition_scheme, pivot is the middle element
+ * {@link https://en.wikipedia.org/wiki/Quicksort#Hoare_partition_scheme}
+ */
 template <std::size_t S>
-void quick_sort(std::array<int, S> &array) {
- // TODO
+void quick_sort_helper_v0(std::array<int, S> &arr, size_t left, size_t right) {
+
+  if (left < right) {
+    size_t pivot_value = arr[(left + right) / 2];
+
+    // Note: the + 1 and - 1 are to make up for the do while loops later on
+
+    size_t i = left - 1;
+    size_t j = right + 1;
+
+    bool done = false;
+    // swap values that are out of place, starting from the two ends of the subarray
+    while (!done) {
+
+      // TODO: explanation for the lack of bounds checking, the two do-while loops can go past the array but it's still correct
+      //      (maybe because the pivot will always be ahead/behind, so theres a guarantee that it will stop because of the strict comparison)
+
+      do {
+        i += 1;
+      } while (arr[i] < pivot_value);
+
+      do {
+        j -= 1;
+      } while (arr[j] > pivot_value);
+
+      if (i >= j) {
+        done = true;
+      } else {
+        std::swap(arr[i], arr[j]);
+      }
+
+    }
+
+    // Note: j lands where the inversion happens, it also happens to be the last index of the left part
+    quick_sort_helper_v0(arr, left, j);
+    quick_sort_helper_v0(arr, j + 1, right);
+
+  }
+
+}
+
+/**
+ * Lomuto Partition Scheme, pivot is the final element
+ * {@link https://en.wikipedia.org/wiki/Quicksort#Lomuto_partition_scheme}
+ * Note: choosing the last element as the pivot will perform worse on already sorted arrays
+ */
+template <std::size_t S>
+void quick_sort_helper_v1(std::array<int, S> &arr, size_t left, size_t right) {
+
+  if (left < right) {
+
+    // Note: arr[right] is the index, but we don't assign it to value for convenience because we are using std::swap
+    //       which requires a pointer (the compiler can coerce the proper types)
+
+    // the partition index is where the pivot will be placed
+    size_t partition_idx = left;
+ 
+    // Note: recall that right is an index, not a size, so we need to put <= instead of just <
+    for (size_t i = left; i <= right; ++i) {
+      // Note: pi marks the spot for the next value that i finds that is smaller than the pivot,
+      //       this makes it unstable
+      if (arr[i] < arr[right]) {
+        std::swap(arr[i], arr[partition_idx]);
+        partition_idx += 1;
+      }
+    }
+
+    // Note: one observation to note is that arr[right] < any value of arr in range [pi, right - 1], thus arr[right] < arr[pi],
+    //       so after the swap, anything to the right of arr[pi] has a bigger value
+    std::swap(arr[partition_idx], arr[right]);
+
+    // Note: at this point, arr[pi] is in place, so exclude it from subsequent recursive calls
+    quick_sort_helper_v1(arr, left, partition_idx - 1);
+    quick_sort_helper_v1(arr, partition_idx + 1, right);
+
+  }
+
+}
+
+/**
+ * Quick sort. Recursive.
+ * - choose a value from the array, aka the pivot
+ * - move values less than the pivot to the left, and greater than, to the right
+ * - the pivot is now in the right place
+ * - call quicksort recursively on the two parts (excluding the pivot)
+ */
+template <std::size_t S>
+void quick_sort(std::array<int, S> &arr) {
+  quick_sort_helper_v0(arr, 0, arr.size() - 1);
+  // quick_sort_helper_v1(arr, 0, arr.size() - 1);
 }
 
 template <std::size_t S>
@@ -28,12 +128,12 @@ void merge_v0(std::array<int, S> &arr, size_t left, size_t mid, size_t right) {
   size_t size_left = mid - left + 1;
 
   // Note: typically we put + 1 when calculating size from inclusive indices, 
-  //       but since we don't want to include the item at mid on the right part, we omit the + 1
+  //       but because arr[mid] is already included the left part, we omit the + 1
   size_t size_right = right - mid;
 
   int *temp_arr = new int[size_left + size_right];
-
-  // Create a copy
+  // Make a copy of the subarray we are looking at
+  // Note: recall that iterator ranges are [begin, end), that's why we need a + 1 on the ending iterator
   std::copy(arr.begin() + left, arr.begin() + right + 1, temp_arr);
 
   // i is the amount of items we have taken from left array
@@ -60,7 +160,7 @@ void merge_v0(std::array<int, S> &arr, size_t left, size_t mid, size_t right) {
     k += 1;
   }
 
-  // Note: at this point one, one of the two halves have had all their items put in place, do the rest for the other half
+  // Note: at this point, one of the two halves have had all their items put in place, so do the rest for the other half
 
   // Put the rest of the left part
   while (i < size_left) {
@@ -133,7 +233,6 @@ void selection_sort(std::array<int, S> &arr) {
     }
 
     // Swap the min with the first element of the unsorted subarray
-    // Note: std::swap uses move semantics so it's probably faster than copy
     std::swap(arr[min_index], arr[i]);
   }
 }
@@ -364,7 +463,7 @@ void shuffle(std::array<int, S>& array, std::string seed) {
 
 int main() {
 
-  std::array<int, 100> arr;
+  std::array<int, 10> arr;
 
   // Fill the array with consecutive numbers starting from 0
   // Note: iota is the ninth letter of the greek alphabet, so the name doesn't really give a hint to what it does
@@ -381,7 +480,8 @@ int main() {
   // insertion_sort_v2(arr1);
   // insertion_sort_v3(arr1);
   // selection_sort(arr1);
-  merge_sort_v0(arr1);
+  // merge_sort_v0(arr1);
+  quick_sort(arr1);
 
   // std::cout << find_insertion_point(arr1, -1) << std::endl;
   // std::cout << binary_search(arr1, 0, 0, 9) << std::endl;
